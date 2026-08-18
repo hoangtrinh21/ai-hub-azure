@@ -1,0 +1,4 @@
+azure-mgmt-appcontainers
+azure-identity
+azure-mgmt-resource
+pydantic-settings
