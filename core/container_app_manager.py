@@ -3,7 +3,7 @@ from azure.mgmt.appcontainers import ContainerAppsAPIClient
 from azure.mgmt.appcontainers.models import (
     ContainerApp, ManagedEnvironment, ManagedServiceIdentity, Template, Container, Configuration, 
     Ingress, ContainerResources, Secret, RegistryCredentials,
-    Scale, ScaleRule, HttpScaleRule, WorkloadProfile
+    Scale, WorkloadProfile
 )
 from azure.core.exceptions import AzureError
 import logging
@@ -28,16 +28,22 @@ class AzureContainerAppManager:
         self.client = ContainerAppsAPIClient(self.credential, self.subscription_id)
 
     def get_environment_id(self, env_name: str):
-        """Lấy hoặc tạo Managed Environment ID"""
+        """Lấy hoặc tạo Managed Environment hỗ trợ cả Serverless CPU và Serverless GPU"""
         try:
             logger.info(f"Đang kiểm tra Environment: {env_name}...")
             
             env_payload = ManagedEnvironment(
                 location=self.location,
                 workload_profiles=[
+                    # 1. Serverless CPU Profile
                     WorkloadProfile(
                         workload_profile_type="Consumption",
-                        name="Consumption"
+                        name="Serverless-CPU"
+                    ),
+                    # 2. Serverless GPU Profile (NVIDIA T4)
+                    WorkloadProfile(
+                        workload_profile_type="Consumption-GPU-NC8as-T4",
+                        name="Serverless-GPU-T4"
                     )
                 ]
             )
@@ -54,14 +60,35 @@ class AzureContainerAppManager:
             logger.error(f"Lỗi Environment: {e}")
             raise
 
-    def create_or_update_app(self, env_name: str, image: str, cpu: float = 1.0, memory: str = "2.0Gi", port: int = 80):
-        """Deploy Container App lên Azure"""
+    def create_or_update_app(
+        self, 
+        env_name: str, 
+        image: str, 
+        cpu: float = None, 
+        memory: str = None, 
+        port: int = 8000,
+        use_gpu: bool = False
+    ):
+        """Deploy Container App lên Azure với tùy chọn Serverless CPU hoặc Serverless GPU"""
         env_id = self.get_environment_id(env_name)
         registry_secret_name = "registry-password"
+
+        # Tự động chọn Workload Profile và thông số RAM/CPU phù hợp
+        if use_gpu or settings.use_gpu:
+            workload_profile_name = "Serverless-GPU-T4"
+            cpu = cpu if cpu is not None else 4.0
+            memory = memory if memory is not None else "16.0Gi"
+            logger.info("⚡ Đang triển khai với cấu hình SERVERLESS GPU (NVIDIA T4)...")
+        else:
+            workload_profile_name = "Serverless-CPU"
+            cpu = cpu if cpu is not None else 1.0
+            memory = memory if memory is not None else "2.0Gi"
+            logger.info("🌱 Đang triển khai với cấu hình SERVERLESS CPU...")
 
         container_app_config = ContainerApp(
             location=self.location,
             managed_environment_id=env_id,
+            workload_profile_name=workload_profile_name,
             identity=ManagedServiceIdentity(type="SystemAssigned"), 
             configuration=Configuration(
                 secrets=[Secret(name=registry_secret_name, value=settings.registry_password)],
@@ -75,7 +102,8 @@ class AzureContainerAppManager:
                 ingress=Ingress(
                     external=True, 
                     target_port=port,
-                    transport="auto"
+                    transport="http",
+                    allow_insecure=True
                 )
             ),
             template=Template(
@@ -88,7 +116,7 @@ class AzureContainerAppManager:
                 ],
                 scale=Scale(
                     min_replicas=0,
-                    max_replicas=1,
+                    max_replicas=2,
                 )
             )
         )
@@ -112,43 +140,64 @@ class AzureContainerAppManager:
             logger.error(f"Lỗi Azure khi deploy: {e}")
             return None
 
-    def stop_app_completely(self):
-        """
-        Dừng Container App bằng cách deactivate các active revision.
-        Tránh lỗi ContainerAppSecretInvalid do không gửi lại payload cấu hình chứa secret.
-        """
+    def stop_app_completely(self) -> bool:
+        """Dừng Container App bằng cách deactivate tất cả các active revision."""
         try:
-            logger.info(f"Bắt đầu dừng Container App: {settings.app_name} trong RG: {settings.azure_resource_group}")
+            logger.info(f"Bắt đầu dừng Container App: {settings.app_name} trong RG: {self.resource_group}")
 
-            # 1. Lấy danh sách tất cả các revision của app
             revisions = self.client.container_apps_revisions.list_revisions(
-                resource_group_name=settings.azure_resource_group,
+                resource_group_name=self.resource_group,
                 container_app_name=settings.app_name
             )
 
             deactivated_count = 0
 
-            # 2. Duyệt qua và tắt (deactivate) các revision đang active
             for rev in revisions:
                 if rev.active:
                     logger.info(f"Đang deactivate revision: {rev.name}...")
-                    # SỬA TẠI ĐÂY: đổi name=... thành revision_name=...
                     self.client.container_apps_revisions.deactivate_revision(
-                        resource_group_name=settings.azure_resource_group,
+                        resource_group_name=self.resource_group,
                         container_app_name=settings.app_name,
                         revision_name=rev.name
                     )
                     deactivated_count += 1
 
             if deactivated_count == 0:
-                logger.info(f"Container App '{settings.app_name}' hiện đã tắt từ trước (không có revision nào active).")
+                logger.info(f"Container App '{settings.app_name}' hiện đã tắt từ trước.")
             else:
-                logger.info(f"Đã dừng thành công Container App '{settings.app_name}' ({deactivated_count} revision đã được tắt).")
+                logger.info(f"Đã dừng thành công Container App '{settings.app_name}'.")
 
             return True
 
         except Exception as e:
             logger.error(f"Lỗi khi dừng App: {e}")
+            return False
+
+    def start_app(self) -> bool:
+        """Bật lại Container App bằng cách activate revision mới nhất."""
+        try:
+            logger.info(f"Bắt đầu bật lại Container App: {settings.app_name}")
+
+            app = self.client.container_apps.get(self.resource_group, settings.app_name)
+            latest_revision_name = app.latest_revision_name
+
+            if not latest_revision_name:
+                logger.warning(f"Không tìm thấy revision nào cho App: {settings.app_name}")
+                return False
+
+            logger.info(f"Đang activate revision mới nhất: {latest_revision_name}...")
+
+            self.client.container_apps_revisions.activate_revision(
+                resource_group_name=self.resource_group,
+                container_app_name=settings.app_name,
+                revision_name=latest_revision_name
+            )
+
+            logger.info(f"Đã bật lại Container App '{settings.app_name}' thành công.")
+            return True
+
+        except Exception as e:
+            logger.error(f"Lỗi khi bật lại App: {str(e)}")
             return False
 
     def get_app_status(self):
@@ -158,42 +207,8 @@ class AzureContainerAppManager:
             return {
                 "name": app.name,
                 "running_status": app.provisioning_state,
-                "min_replicas": app.template.scale.min_replicas,
-                "max_replicas": app.template.scale.max_replicas
+                "latest_revision": app.latest_revision_name
             }
         except Exception as e:
             logger.error(f"Lỗi khi lấy thông tin app: {e}")
             return None
-
-    def start_app(self) -> bool:
-        """
-        Bật lại Container App bằng cách activate revision mới nhất.
-        """
-        try:
-            logger.info(f"Bắt đầu bật Container App: {settings.app_name}")
-
-            revisions = list(self.client.container_apps_revisions.list_revisions(
-                resource_group_name=settings.azure_resource_group,
-                container_app_name=settings.app_name
-            ))
-
-            if not revisions:
-                logger.warning(f"Không tìm thấy revision nào cho App: {settings.app_name}")
-                return False
-
-            latest_revision = revisions[0]
-            logger.info(f"Đang activate revision: {latest_revision.name}...")
-
-            # SỬA TẠI ĐÂY: đổi name=... thành revision_name=...
-            self.client.container_apps_revisions.activate_revision(
-                resource_group_name=settings.azure_resource_group,
-                container_app_name=settings.app_name,
-                revision_name=latest_revision.name
-            )
-
-            logger.info(f"Đã bật lại Container App '{settings.app_name}' thành công.")
-            return True
-
-        except Exception as e:
-            logger.error(f"Lỗi khi bật lại App: {str(e)}")
-            return False
