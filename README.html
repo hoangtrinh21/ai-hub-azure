@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hướng Dẫn Quản Lý & Triển Khai Azure Container Apps</title>
+    <style>
+        :root {
+            --primary-color: #0078d4;
+            --text-color: #24292e;
+            --bg-color: #f6f8fa;
+            --card-bg: #ffffff;
+            --border-color: #e1e4e8;
+            --code-bg: #1e1e1e;
+            --code-text: #d4d4d4;
+            --alert-bg: #fff8c5;
+            --alert-border: #d97706;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            border: 1px solid var(--border-color);
+        }
+
+        h1 {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 10px;
+            font-size: 24px;
+        }
+
+        h2 {
+            color: #005a9e;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 8px;
+            margin-top: 30px;
+            font-size: 20px;
+        }
+
+        h3 {
+            color: #333333;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+
+        p, li {
+            font-size: 14px;
+        }
+
+        ul, ol {
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 6px;
+        }
+
+        code {
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            background-color: rgba(27, 31, 35, 0.05);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #d73a49;
+        }
+
+        pre {
+            background-color: var(--code-bg);
+            color: var(--code-text);
+            padding: 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: inherit;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 13px;
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            padding: 10px 12px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #f1f3f5;
+            font-weight: 600;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+
+        .alert-warning {
+            background-color: var(--alert-bg);
+            border-left: 4px solid var(--alert-border);
+            padding: 12px 16px;
+            margin: 16px 0;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .toc {
+            background-color: #f8f9fa;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 30px;
+        }
+
+        .toc h3 {
+            margin-top: 0;
+        }
+
+        .toc ul {
+            list-style-type: none;
+            padding-left: 0;
+            margin-bottom: 0;
+        }
+
+        .toc li {
+            margin-bottom: 8px;
+        }
+
+        .toc a {
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        .toc a:hover {
+            text-decoration: underline;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #ffffff;
+            background-color: var(--primary-color);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📖 Hướng Dẫn Quản Lý & Tự Động Hóa Triển Khai Azure Container Apps</h1>
+    
+    <p>Tài liệu hướng dẫn từng bước thiết lập hạ tầng trên <strong>Azure Portal</strong>, cấu hình biến môi trường và sử dụng mã nguồn Python (Azure SDK) để quản lý, triển khai Container phục vụ mục đích <strong>Training Model AI</strong> hoặc <strong>Chạy Web API Service</strong> trên hạ tầng Azure Container Apps.</p>
+
+    <!-- MỤC LỤC -->
+    <div class="toc">
+        <h3>📌 MỤC LỤC</h3>
+        <ul>
+            <li><a href="#section-0">📂 Cấu Trúc Thư Mục Dự Án</a></li>
+            <li><a href="#section-1">1. Lấy Azure Tenant ID, Client ID và Client Secret</a></li>
+            <li><a href="#section-2">2. Lấy Subscription ID & Phân Quyền RBAC</a></li>
+            <li><a href="#section-3">3. Lấy Thông Tin Private Registry</a></li>
+            <li><a href="#section-4">4. Kiểm Tra Danh Sách Location (Region) Được Phép Hợp Lệ</a></li>
+            <li><a href="#section-5">5. Đăng Ký Resource Providers Bắt Buộc</a></li>
+            <li><a href="#section-6">6. Mẫu Cấu Hình Biến Môi Trường (.env)</a></li>
+            <li><a href="#section-7">7. Hướng Dẫn Vận Hành & Quy Trình Chạy</a></li>
+            <li><a href="#section-8">8. Cách Lấy Tên Miền (Application URL) & Lưu Ý Ingress</a></li>
+            <li><a href="#section-9">9. Xử Lý Các Lỗi Thường Gặp (Troubleshooting)</a></li>
+        </ul>
+    </div>
+
+    <!-- 0. CẤU TRÚC THƯ MỤC -->
+    <h2 id="section-0">📂 CẤU TRÚC THƯ MỤC DỰ ÁN</h2>
+<pre><code>azure-container-app/
+├── core/
+│   ├── __init__.py
+│   ├── settings.py                # Quản lý cấu hình biến môi trường
+│   └── container_app_manager.py   # Lớp xử lý giao tiếp Azure SDK
+├── .env                           # Lưu trữ thông tin xác thực & cấu hình
+├── main.py                        # Script thực thi deploy/chạy ứng dụng
+├── stop_app.py                    # Script dừng container để ngắt tính phí
+└── requirements.txt               # Thư viện phụ thuộc</code></pre>
+
+    <!-- 1. TENANT / CLIENT ID -->
+    <h2 id="section-1">1. Lấy Azure Tenant ID, Client ID và Client Secret</h2>
+    <p>Để phần mềm Python giao tiếp được với Azure API, hệ thống cần tạo một <strong>Service Principal</strong> (Tài khoản định danh cho ứng dụng).</p>
+
+    <h3>Bước 1.1: Tạo App Registration</h3>
+    <ol>
+        <li>Truy cập <a href="https://portal.azure.com/" target="_blank">Azure Portal</a>.</li>
+        <li>Trên thanh tìm kiếm, chọn <strong>Microsoft Entra ID</strong> (trước đây là Azure Active Directory).</li>
+        <li>Tại menu bên trái, chọn <strong>App registrations</strong> ➔ Nhấn <strong>+ New registration</strong>.</li>
+        <li>Điền các thông tin:
+            <ul>
+                <li><strong>Name</strong>: <code>AI-Hub-Manager</code> (hoặc tên nhận diện bất kỳ).</li>
+                <li><strong>Supported account types</strong>: Chọn <em>Accounts in this organizational directory only (Single tenant)</em>.</li>
+            </ul>
+        </li>
+        <li>Nhấn <strong>Register</strong>.</li>
+    </ol>
+
+    <h3>Bước 1.2: Sao Chép Tenant ID & Client ID</h3>
+    <ol>
+        <li>Màn hình tự động chuyển tới trang <strong>Overview</strong> của App vừa tạo.</li>
+        <li>Sao chép 2 giá trị:
+            <ul>
+                <li>📋 <strong>Application (client) ID</strong> ➔ Dùng cho <code>AZURE_CLIENT_ID</code></li>
+                <li>📋 <strong>Directory (tenant) ID</strong> ➔ Dùng cho <code>AZURE_TENANT_ID</code></li>
+            </ul>
+        </li>
+    </ol>
+
+    <h3>Bước 1.3: Tạo Client Secret</h3>
+    <ol>
+        <li>Tại menu bên trái của App, chọn <strong>Certificates & secrets</strong>.</li>
+        <li>Chọn tab <strong>Client secrets</strong> ➔ Nhấn <strong>+ New client secret</strong>.</li>
+        <li>Điền <strong>Description</strong> ➔ Nhấn <strong>Add</strong>.</li>
+    </ol>
+
+    <div class="alert-warning">
+        ⚠️ <strong>LƯU Ý CỰC KỲ QUAN TRỌNG:</strong>
+        <br>Sao chép ngay chuỗi ký tự tại cột <strong>VALUE</strong> (chứ KHÔNG copy cột <em>Secret ID</em>). Giá trị <code>Value</code> chỉ hiển thị <strong>1 lần duy nhất</strong> tại thời điểm tạo.
+        <br>📋 <strong>Value</strong> ➔ Dùng cho <code>AZURE_CLIENT_SECRET</code>
+    </div>
+
+    <!-- 2. SUBSCRIPTION ID & RBAC -->
+    <h2 id="section-2">2. Lấy Subscription ID & Phân Quyền RBAC</h2>
+
+    <h3>Bước 2.1: Lấy Subscription ID</h3>
+    <ol>
+        <li>Gõ <strong>Subscriptions</strong> trên thanh tìm kiếm của Azure Portal ➔ Chọn <strong>Subscriptions</strong>.</li>
+        <li>Sao chép chuỗi mã tại cột <strong>Subscription ID</strong>.
+            <br>📋 <strong>Subscription ID</strong> ➔ Dùng cho <code>AZURE_SUBSCRIPTION_ID</code>
+        </li>
+    </ol>
+
+    <h3>Bước 2.2: Phân Quyền Contributor Cho Service Principal</h3>
+    <ol>
+        <li>Bấm trực tiếp vào tên Subscription cần cấu hình.</li>
+        <li>Tại menu bên trái, chọn <strong>Access control (IAM)</strong>.</li>
+        <li>Nhấn <strong>+ Add</strong> ➔ Chọn <strong>Add role assignment</strong>.</li>
+        <li>Tại tab <strong>Role</strong>: Tìm và chọn role <strong>Contributor</strong> (Người đóng góp) ➔ Nhấn <strong>Next</strong>.</li>
+        <li>Tại tab <strong>Members</strong>:
+            <ul>
+                <li>Chọn <em>User, group, or service principal</em>.</li>
+                <li>Nhấn <strong>+ Select members</strong>.</li>
+                <li>Tìm tên App đã tạo ở Bước 1.1 (<code>AI-Hub-Manager</code>) ➔ Chọn app ➔ Nhấn <strong>Select</strong>.</li>
+            </ul>
+        </li>
+        <li>Nhấn <strong>Review + assign</strong> để hoàn tất gán quyền.</li>
+    </ol>
+
+    <!-- 3. PRIVATE REGISTRY -->
+    <h2 id="section-3">3. Lấy Thông Tin Private Registry</h2>
+    <p>Khi Container App tải ảnh Docker (Image) về triển khai, hệ thống cần thông tin đăng nhập vào Registry.</p>
+
+    <h3>Trường hợp A: Sử dụng Azure Container Registry (ACR)</h3>
+    <ol>
+        <li>Trên Azure Portal, truy cập dịch vụ <strong>Container registries</strong> ➔ Bấm vào ACR tương ứng.</li>
+        <li>Tại menu bên trái ➔ Chọn <strong>Access keys</strong>.</li>
+        <li>Bật công tắc <strong>Admin user</strong> sang <code>Enable</code>.</li>
+        <li>Copy các giá trị:
+            <ul>
+                <li><code>Login server</code> (Ví dụ: <code>myregistry.azurecr.io</code>) ➔ <code>REGISTRY_SERVER</code></li>
+                <li><code>Username</code> ➔ <code>REGISTRY_USERNAME</code></li>
+                <li><code>password</code> ➔ <code>REGISTRY_PASSWORD</code></li>
+            </ul>
+        </li>
+    </ol>
+
+    <h3>Trường hợp B: Sử dụng Private Registry Riêng (VNPT / Docker Hub / Custom)</h3>
+    <ol>
+        <li><code>REGISTRY_SERVER</code>: Tên miền host của Registry (<strong>KHÔNG</strong> chứa <code>https://</code> hoặc dấu <code>/</code> ở cuối). Ví dụ: <code>ai-repository.vnpt.vn</code> hoặc <code>docker.io</code>.</li>
+        <li><code>REGISTRY_USERNAME</code>: Tài khoản đăng nhập Registry.</li>
+        <li><code>REGISTRY_PASSWORD</code>: Mật khẩu hoặc Access Token của Registry.</li>
+    </ol>
+
+    <!-- 4. LOCATION / REGION POLICY -->
+    <h2 id="section-4">4. Kiểm Tra Danh Sách Location (Region) Được Phép Hợp Lệ</h2>
+    <p>Một số loại tài khoản Azure (như <em>Azure for Students</em> hoặc tài khoản Enterprise) có áp dụng <strong>Azure Policy</strong> giới hạn cụ thể các Vùng (Region) được phép tạo tài nguyên.</p>
+
+    <h3>Các bước kiểm tra danh sách Region được phép:</h3>
+    <ol>
+        <li>Đăng nhập vào <a href="https://portal.azure.com/" target="_blank">Azure Portal</a>.</li>
+        <li>Nhập <strong>Policy</strong> vào thanh tìm kiếm trên cùng ➔ Chọn dịch vụ <strong>Policy</strong>.</li>
+        <li>Tại menu bên trái, chọn mục <strong>Assignments</strong>.</li>
+        <li>Chọn chính sách có tên: <strong><code>Allowed resource deployment regions</code></strong>.</li>
+        <li>Chọn tab <strong>Parameters</strong> ➔ Xem danh sách các Region được phép tại dòng <strong><code>listOfAllowedLocations</code></strong> (cột <em>Parameter value</em>).</li>
+    </ol>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Mã điền .env (AZURE_LOCATION)</th>
+                <th>Tên Khu Vực</th>
+                <th>Đánh Giá Độ Tối Ưu Phổ Biến</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>eastasia</code></td>
+                <td>East Asia (Hong Kong)</td>
+                <td><span class="badge">Khuyên Dùng</span> Tốc độ cao về VN, băng thông tốt</td>
+            </tr>
+            <tr>
+                <td><code>japaneast</code></td>
+                <td>Japan East (Tokyo, Nhật Bản)</td>
+                <td>Hạ tầng rất mạnh, ổn định cao</td>
+            </tr>
+            <tr>
+                <td><code>koreacentral</code></td>
+                <td>Korea Central (Seoul, Hàn Quốc)</td>
+                <td>Tốc độ phản hồi tốt</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- 5. RESOURCE PROVIDERS -->
+    <h2 id="section-5">5. Đăng Ký Resource Providers Bắt Buộc</h2>
+    <p>Mặc định, tài khoản Azure mới chưa bật sẵn các dịch vụ Container. Việc kích hoạt 2 dịch vụ dưới đây là bắt buộc (thực hiện 1 lần duy nhất):</p>
+
+    <ol>
+        <li>Vào <strong>Subscriptions</strong> ➔ Chọn Subscription tương ứng.</li>
+        <li>Tại menu bên trái, chọn <strong>Settings</strong> ➔ Chọn <strong>Resource providers</strong>.</li>
+        <li>Tìm kiếm và chọn từng provider sau, nếu trạng thái chưa phải <code>Registered</code> thì nhấn <strong>Register</strong>:
+            <ul>
+                <li><strong><code>Microsoft.App</code></strong> (Dịch vụ quản lý Container Apps)</li>
+                <li><strong><code>Microsoft.OperationalInsights</code></strong> (Dịch vụ lưu Log Analytics)</li>
+            </ul>
+        </li>
+    </ol>
+
+    <!-- 6. MAU ENV -->
+    <h2 id="section-6">6. Mẫu Cấu Hình Biến Môi Trường (.env)</h2>
+    <p>Sau khi thu thập đầy đủ các thông số ở các bước trên, tiến hành điền vào file <code>.env</code> tại thư mục gốc dự án:</p>
+
+<pre><code># 1. Cấu hình Xác thực Azure
+AZURE_SUBSCRIPTION_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+AZURE_TENANT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+AZURE_CLIENT_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+AZURE_CLIENT_SECRET=your_client_secret_value_here
+
+# 2. Cấu hình Môi trường Container
+AZURE_RESOURCE_GROUP=AI-Hub-RG
+AZURE_LOCATION=eastasia
+AZURE_CONTAINER_ENV=ai-hub-env-hk
+
+# 3. Cấu hình Docker Registry
+REGISTRY_SERVER=ai-repository.vnpt.vn
+REGISTRY_USERNAME=your_registry_username
+REGISTRY_PASSWORD=your_registry_password</code></pre>
+
+    <!-- 7. QUY TRINH CHAY -->
+    <h2 id="section-7">7. Hướng Dẫn Vận Hành & Quy Trình Chạy</h2>
+
+    <h3>Bước 7.1: Cài đặt phụ thuộc</h3>
+<pre><code>python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt</code></pre>
+
+    <h3>Bước 7.2: Kích hoạt chạy Container (main.py)</h3>
+    <p>Thực hiện lệnh bên dưới để khởi tạo hạ tầng và kéo ảnh Docker về chạy:</p>
+<pre><code>python main.py</code></pre>
+
+    <h3>Bước 7.3: Theo dõi tiến trình Training Model</h3>
+    <ol>
+        <li>Truy cập <a href="https://portal.azure.com/" target="_blank">Azure Portal</a>.</li>
+        <li>Tìm và chọn <strong>Container Apps</strong> ➔ Chọn App đang chạy (Ví dụ: <code>ai-hub-semi</code>).</li>
+        <li>Mở menu bên trái: chọn <strong>Monitoring</strong> ➔ <strong>Log stream</strong> để xem log in ra theo thời gian thực (realtime).</li>
+        <li>Tiến trình được coi là hoàn tất khi log hiển thị hoàn thành các Epochs / Báo lưu weights thành công và biểu đồ <strong>Metrics</strong> ➔ <strong>CPU Usage</strong> giảm về gần 0%.</li>
+    </ol>
+
+    <h3>Bước 7.4: Dừng Container để ngắt tính phí (stop_app.py)</h3>
+    <p>Khi tiến trình Training hoàn tất, thực hiện chạy lệnh dừng khẩn cấp để đưa số lượng Replicas về 0, ngắt hoàn toàn chi phí phát sinh:</p>
+<pre><code>python stop_app.py</code></pre>
+
+    <!-- 8. APPLICATION URL & INGRESS -->
+    <h2 id="section-8">8. Cách Lấy Tên Miền (Application URL) & Lưu Ý Ingress</h2>
+
+    <h3>8.1. Cách lấy URL truy cập</h3>
+    <p>Nếu container triển khai dịch vụ Web API (FastAPI, Flask...), Azure sẽ cấp một tên miền FQDN chuẩn HTTPS có định dạng:</p>
+    <p><code>https://&lt;ten-app&gt;.&lt;chuoi-ngau-nhien&gt;.&lt;region&gt;.azurecontainerapps.io</code></p>
+
+    <ul>
+        <li><strong>Qua Code:</strong> Kết quả trả về của hàm <code>create_or_update_app()</code> chứa thuộc tính <code>app_info['fqdn']</code>.</li>
+        <li><strong>Qua Portal:</strong> Vào trang <strong>Overview</strong> của Container App ➔ Xem tại mục <strong>Application Url</strong>.</li>
+    </ul>
+
+    <h3>8.2. Giải thích trường hợp "Application Url: Ingress disabled"</h3>
+    <ul>
+        <li><strong>Container chỉ Train Model (Batch Script):</strong> Hiện tượng này là bình thường. Do script Python kết thúc không mở Web Server ở cổng HTTP (80/8080), Envoy Proxy sẽ ghi nhận cổng không hoạt động. Quá trình training vẫn diễn ra bình thường ngầm bên trong.</li>
+        <li><strong>Container là Web API:</strong> Cần kiểm tra lại cấu hình code Python trong Docker xem đã chạy server (Uvicorn/Gunicorn) lắng nghe đúng cổng truyền vào hay chưa, và điều chỉnh tham số <code>transport="http"</code>, <code>allow_insecure=True</code> trong đối tượng <code>Ingress</code>.</li>
+    </ul>
+
+    <!-- 9. TROUBLESHOOTING -->
+    <h2 id="section-9">9. Xử Lý Các Lỗi Thường Gặp (Troubleshooting)</h2>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Báo Lỗi (Error Message)</th>
+                <th>Nguyên Nhân</th>
+                <th>Cách Khắc Phục</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><code>ManagedEnvironmentScheduledForDelete</code></td>
+                <td>Môi trường <code>AZURE_CONTAINER_ENV</code> cũ đang trong quá trình xóa ngầm trên Azure (mất 5-15 phút).</td>
+                <td>Mở file <code>.env</code>, đổi tên <code>AZURE_CONTAINER_ENV</code> thành tên mới (ví dụ: <code>ai-hub-env-v2</code>).</td>
+            </tr>
+            <tr>
+                <td><code>MaxNumberOfRegionalEnvironmentsInSubExceeded</code></td>
+                <td>Hạn ngạch (Quota) cước phí giới hạn tối đa 1 Environment trên 1 Vùng (Region).</td>
+                <td>Mở file <code>.env</code>, đổi <code>AZURE_LOCATION</code> sang một Region khác (ví dụ: từ <code>indonesiacentral</code> sang <code>eastasia</code>).</td>
+            </tr>
+            <tr>
+                <td><code>RequestDisallowedByAzure</code></td>
+                <td>Region được chọn nằm ngoài danh sách cho phép của Azure Policy trên tài khoản.</td>
+                <td>Kiểm tra mục <strong>Policy</strong> trên Portal (theo Mục 4) và đổi <code>AZURE_LOCATION</code> về đúng Region được cấp phép.</td>
+            </tr>
+            <tr>
+                <td><code>AADSTS7000215: Invalid client secret</code></td>
+                <td>Copy nhầm <strong>Secret ID</strong> thay vì copy giá trị cột <strong>Secret Value</strong>.</td>
+                <td>Vào lại <em>App Registration</em> ➔ <em>Certificates & secrets</em> ➔ Tạo Secret mới và sao chép đúng cột <strong>Value</strong>.</td>
+            </tr>
+            <tr>
+                <td><code>AuthorizationFailed</code></td>
+                <td>Service Principal chưa được cấp quyền quản lý tài nguyên.</td>
+                <td>Vào Subscription ➔ <em>Access control (IAM)</em> ➔ Gán quyền <strong>Contributor</strong> cho App Registration.</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+</body>
+</html>

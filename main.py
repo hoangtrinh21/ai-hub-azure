@@ -1,29 +1,30 @@
-from container_app_manager import AzureContainerAppManager
-
+from core.container_app_manager import AzureContainerAppManager
+from core.settings import settings
 
 if __name__ == "__main__":
-    # Các thông số này nên lấy từ file .env
-    SUB_ID = "your-id-here"
-    RG = "AI-Hub-Resources"
-    LOC = "eastus"
+    manager = AzureContainerAppManager()
 
-    manager = AzureContainerAppManager(SUB_ID, RG, LOC)
+    IMAGE_NAME = "docker.io/trinhhoang01/ml-test-app:v2"
 
-    # 1. Tạo một AI Worker model (ví dụ dùng image của bạn trên Docker Hub)
+    print(f"🚀 Bắt đầu triển khai Container để Test Training 1 lần...")
+    
     app_info = manager.create_or_update_app(
-        app_name="phi3-mini-worker",
-        env_name="ai-hub-env",
-        image="mcr.microsoft.com/azuredocs/containerapps-helloworld:latest", # Thay bằng image AI của bạn
+        env_name=settings.azure_container_env,
+        image=IMAGE_NAME,
         cpu=1.0,
-        memory="2.0Gi"
+        memory="2.0Gi",
+        port=8000
     )
 
     if app_info:
-        print(f"App của bạn đã sẵn sàng tại: {app_info['fqdn']}")
-
-    # 2. Xem danh sách các app đang chạy
-    all_apps = manager.list_apps()
-    print(f"Các ứng dụng hiện có: {all_apps}")
-
-    # 3. Xóa app khi không cần thiết
-    # manager.delete_app("phi3-mini-worker")
+        print("\n" + "="*60)
+        print(f"ĐÃ KÍCH HOẠT CONTAINER THÀNH CÔNG!")
+        print(f"App Name: {app_info['name']}")
+        print(f"Status:   {app_info['provisioning_state']}")
+        print(f"🌐 Tên miền ứng dụng của bạn là: https://{app_info['fqdn']}")
+        print("="*60)
+        print("\nBƯỚC TIẾP THEO ĐỂ XEM ĐÃ TRAIN XONG CHƯA:")
+        print("1. Mở Azure Portal -> Vào Container App 'ai-hub-semi'.")
+        print("2. Vào menu bên trái: Monitoring -> Log stream để xem log train.")
+        print("3. Khi thấy log báo Train xong, hãy chạy file `python stop_app.py` để TẮT CONTAINER tránh bị lặp lại và tiết kiệm tiền.")
+        print("="*60)

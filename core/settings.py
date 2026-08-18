@@ -3,6 +3,7 @@ from typing import Optional
 
 class Settings(BaseSettings):
     # Azure Config
+    app_name: str
     azure_subscription_id: str
     azure_tenant_id: str
     azure_client_id: str
@@ -12,11 +13,18 @@ class Settings(BaseSettings):
     azure_location: str = "eastus"
     azure_container_env: str = "ai-hub-env"
 
-    # AI Vendor Keys
+    # AI Vendor Keys (Optional)
     openai_api_key: Optional[str] = None
-    
-    # Tự động đọc file .env
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-# Khởi tạo object settings để dùng chung toàn hệ thống
+    # Registry
+    registry_server: str
+    registry_username: str
+    registry_password: str
+
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        env_file_encoding='utf-8',
+        extra="ignore"
+    )
+
 settings = Settings()
