@@ -1,8 +1,5 @@
-from core.container_app_manager import (
-    AzureContainerAppManager,
-)
+from core.container_app_manager import AzureContainerAppManager
 from core.settings import settings
-
 
 if __name__ == "__main__":
     manager = AzureContainerAppManager()
@@ -17,9 +14,7 @@ if __name__ == "__main__":
     )
 
     if not app_info:
-        raise SystemExit(
-            "Deploy Container App thất bại."
-        )
+        raise SystemExit("Deploy Container App thất bại.")
 
     fqdn = app_info["fqdn"]
 

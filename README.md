@@ -5,7 +5,7 @@ Dự án cung cấp giải pháp đóng gói, huấn luyện và phục vụ (se
 
 ## Tài liệu hướng dẫn
 
-Toàn bộ tài liệu chi tiết về dự án đã được chuyển vào thư mục `docs/`. 
+Toàn bộ tài liệu chi tiết về dự án đã được chuyển vào thư mục `docs/`.
 
 ## Cấu Trúc Dự Án
 

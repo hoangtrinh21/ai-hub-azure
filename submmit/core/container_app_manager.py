@@ -1,9 +1,12 @@
+import logging
+
+from azure.core.exceptions import AzureError
 from azure.identity import ClientSecretCredential
 from azure.mgmt.appcontainers import ContainerAppsAPIClient
 from azure.mgmt.appcontainers.models import (
-    ContainerApp,
     Configuration,
     Container,
+    ContainerApp,
     ContainerResources,
     EnvironmentVar,
     HttpScaleRule,
@@ -17,26 +20,24 @@ from azure.mgmt.appcontainers.models import (
     Template,
     WorkloadProfile,
 )
-from azure.core.exceptions import AzureError
-import logging
+from core.settings import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from submmit.core.settings import settings
 
 class AzureContainerAppManager:
     def __init__(self):
         self.subscription_id = settings.azure_subscription_id
         self.resource_group = settings.azure_resource_group
         self.location = settings.azure_location
-        
+
         self.credential = ClientSecretCredential(
             tenant_id=settings.azure_tenant_id,
             client_id=settings.azure_client_id,
-            client_secret=settings.azure_client_secret
+            client_secret=settings.azure_client_secret,
         )
-        
+
         self.client = ContainerAppsAPIClient(self.credential, self.subscription_id)
 
     def get_environment_id(
@@ -47,9 +48,7 @@ class AzureContainerAppManager:
         """Lấy hoặc tạo Managed Environment."""
 
         try:
-            logger.info(
-                f"Đang kiểm tra Environment: {env_name}..."
-            )
+            logger.info(f"Đang kiểm tra Environment: {env_name}...")
 
             workload_profiles = [
                 WorkloadProfile(
@@ -62,9 +61,7 @@ class AzureContainerAppManager:
                 workload_profiles.append(
                     WorkloadProfile(
                         name="NC8as-T4",
-                        workload_profile_type=(
-                            "Consumption-GPU-NC8as-T4"
-                        ),
+                        workload_profile_type=("Consumption-GPU-NC8as-T4"),
                     )
                 )
 
@@ -73,27 +70,20 @@ class AzureContainerAppManager:
                 workload_profiles=workload_profiles,
             )
 
-            poller = (
-                self.client.managed_environments
-                .begin_create_or_update(
-                    self.resource_group,
-                    env_name,
-                    env_payload,
-                )
+            poller = self.client.managed_environments.begin_create_or_update(
+                self.resource_group,
+                env_name,
+                env_payload,
             )
 
             env = poller.result()
 
-            logger.info(
-                f"Environment sẵn sàng: {env.id}"
-            )
+            logger.info(f"Environment sẵn sàng: {env.id}")
 
             return env.id
 
         except AzureError as e:
-            logger.exception(
-                f"Lỗi khi tạo Managed Environment: {e}"
-            )
+            logger.exception(f"Lỗi khi tạo Managed Environment: {e}")
             raise
 
     def create_or_update_app(
@@ -125,10 +115,7 @@ class AzureContainerAppManager:
             cpu = cpu if cpu is not None else 8.0
             memory = memory if memory is not None else "56Gi"
 
-            logger.info(
-                "Deploy với SERVERLESS GPU "
-                "(Consumption-GPU-NC8as-T4)"
-            )
+            logger.info("Deploy với SERVERLESS GPU " "(Consumption-GPU-NC8as-T4)")
         else:
             workload_profile_name = "Consumption"
             cpu = cpu if cpu is not None else 1.0
@@ -181,11 +168,8 @@ class AzureContainerAppManager:
             ),
             EnvironmentVar(
                 name="OBJECT_STORAGE_SECURE",
-                value=str(
-                    settings.object_storage_secure
-                ).lower(),
+                value=str(settings.object_storage_secure).lower(),
             ),
-
             # Object storage - secret
             EnvironmentVar(
                 name="OBJECT_STORAGE_ACCESS_KEY",
@@ -205,28 +189,22 @@ class AzureContainerAppManager:
             location=self.location,
             environment_id=env_id,
             workload_profile_name=workload_profile_name,
-
             identity=ManagedServiceIdentity(
                 type="SystemAssigned",
             ),
-
             configuration=Configuration(
                 secrets=[
                     registry_password_secret,
                     object_storage_access_key_secret,
                     object_storage_secret_key_secret,
                 ],
-
                 registries=[
                     RegistryCredentials(
                         server=settings.registry_server,
                         username=settings.registry_username,
-                        password_secret_ref=(
-                            "registry-password"
-                        ),
+                        password_secret_ref=("registry-password"),
                     ),
                 ],
-
                 ingress=Ingress(
                     external=True,
                     target_port=port,
@@ -234,23 +212,19 @@ class AzureContainerAppManager:
                     allow_insecure=False,
                 ),
             ),
-
             template=Template(
                 containers=[
                     Container(
                         name="model-test",
                         image=image,
-
                         # Đây là phần inject env vào image
                         env=container_env,
-
                         resources=ContainerResources(
                             cpu=cpu,
                             memory=memory,
                         ),
                     ),
                 ],
-
                 scale=Scale(
                     min_replicas=0,
                     max_replicas=1,
@@ -269,57 +243,44 @@ class AzureContainerAppManager:
         )
 
         try:
-            logger.info(
-                "Đang deploy Container App "
-                f"[{settings.app_name}]..."
-            )
+            logger.info("Đang deploy Container App " f"[{settings.app_name}]...")
 
-            poller = (
-                self.client.container_apps
-                .begin_create_or_update(
-                    self.resource_group,
-                    settings.app_name,
-                    container_app_config,
-                )
+            poller = self.client.container_apps.begin_create_or_update(
+                self.resource_group,
+                settings.app_name,
+                container_app_config,
             )
 
             result = poller.result()
 
             fqdn = None
 
-            if (
-                result.configuration
-                and result.configuration.ingress
-            ):
+            if result.configuration and result.configuration.ingress:
                 fqdn = result.configuration.ingress.fqdn
 
-            logger.info(
-                "Deploy thành công. "
-                f"FQDN: {fqdn}"
-            )
+            logger.info("Deploy thành công. " f"FQDN: {fqdn}")
 
             return {
                 "name": result.name,
                 "fqdn": fqdn,
-                "provisioning_state": (
-                    result.provisioning_state
-                ),
+                "provisioning_state": (result.provisioning_state),
             }
 
         except AzureError as exc:
-            logger.exception(
-                f"Lỗi Azure khi deploy: {exc}"
-            )
+            logger.exception(f"Lỗi Azure khi deploy: {exc}")
             return None
 
     def stop_app_completely(self) -> bool:
         """Dừng Container App bằng cách deactivate tất cả các active revision."""
         try:
-            logger.info(f"Bắt đầu dừng Container App: {settings.app_name} trong RG: {self.resource_group}")
+            logger.info(
+                f"Bắt đầu dừng Container App: {settings.app_name} "
+                "trong RG: {self.resource_group}"
+            )
 
             revisions = self.client.container_apps_revisions.list_revisions(
                 resource_group_name=self.resource_group,
-                container_app_name=settings.app_name
+                container_app_name=settings.app_name,
             )
 
             deactivated_count = 0
@@ -330,12 +291,14 @@ class AzureContainerAppManager:
                     self.client.container_apps_revisions.deactivate_revision(
                         resource_group_name=self.resource_group,
                         container_app_name=settings.app_name,
-                        revision_name=rev.name
+                        revision_name=rev.name,
                     )
                     deactivated_count += 1
 
             if deactivated_count == 0:
-                logger.info(f"Container App '{settings.app_name}' hiện đã tắt từ trước.")
+                logger.info(
+                    f"Container App '{settings.app_name}' hiện đã tắt từ trước."
+                )
             else:
                 logger.info(f"Đã dừng thành công Container App '{settings.app_name}'.")
 
@@ -354,7 +317,9 @@ class AzureContainerAppManager:
             latest_revision_name = app.latest_revision_name
 
             if not latest_revision_name:
-                logger.warning(f"Không tìm thấy revision nào cho App: {settings.app_name}")
+                logger.warning(
+                    f"Không tìm thấy revision nào cho App: {settings.app_name}"
+                )
                 return False
 
             logger.info(f"Đang activate revision mới nhất: {latest_revision_name}...")
@@ -362,7 +327,7 @@ class AzureContainerAppManager:
             self.client.container_apps_revisions.activate_revision(
                 resource_group_name=self.resource_group,
                 container_app_name=settings.app_name,
-                revision_name=latest_revision_name
+                revision_name=latest_revision_name,
             )
 
             logger.info(f"Đã bật lại Container App '{settings.app_name}' thành công.")
@@ -379,7 +344,7 @@ class AzureContainerAppManager:
             return {
                 "name": app.name,
                 "running_status": app.provisioning_state,
-                "latest_revision": app.latest_revision_name
+                "latest_revision": app.latest_revision_name,
             }
         except Exception as e:
             logger.error(f"Lỗi khi lấy thông tin app: {e}")

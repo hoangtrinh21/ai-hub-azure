@@ -12,15 +12,13 @@ from uuid import uuid4
 import joblib
 import numpy as np
 import psutil
+from core.object_storage import ObjectStorage
+from core.settings import settings
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sklearn.datasets import make_classification
 from sklearn.ensemble import RandomForestClassifier
-
-from core.object_storage import ObjectStorage
-from core.settings import settings
-
 
 # ---------------------------------------------------------------------
 # Global configuration
@@ -51,6 +49,7 @@ object_storage = ObjectStorage(
 # ---------------------------------------------------------------------
 # Request models
 # ---------------------------------------------------------------------
+
 
 class PredictRequest(BaseModel):
     """
@@ -173,6 +172,7 @@ class BatchPredictRequest(BaseModel):
 # Utility functions
 # ---------------------------------------------------------------------
 
+
 def get_system_metrics() -> dict[str, Any]:
     process_memory = PROCESS.memory_info()
     system_memory = psutil.virtual_memory()
@@ -227,10 +227,7 @@ def get_expected_features(model) -> int:
     if expected_features is None:
         raise HTTPException(
             status_code=500,
-            detail=(
-                "Không xác định được số lượng feature "
-                "của model."
-            ),
+            detail=("Không xác định được số lượng feature " "của model."),
         )
 
     return int(expected_features)
@@ -261,10 +258,7 @@ def validate_sample(
         if not isinstance(value, (int, float)):
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    f"Feature index {feature_index} "
-                    f"phải là số."
-                ),
+                detail=(f"Feature index {feature_index} " f"phải là số."),
             )
 
 
@@ -274,14 +268,10 @@ def load_artifact_from_file(
     artifact = joblib.load(local_file_path)
 
     if not isinstance(artifact, dict):
-        raise ValueError(
-            "Model artifact phải có dạng dictionary."
-        )
+        raise ValueError("Model artifact phải có dạng dictionary.")
 
     if "model" not in artifact:
-        raise ValueError(
-            "Model artifact không có key 'model'."
-        )
+        raise ValueError("Model artifact không có key 'model'.")
 
     model = artifact["model"]
     metadata = artifact.get("metadata", {})
@@ -294,9 +284,7 @@ def load_model_into_memory(
 ) -> dict[str, Any]:
     global loaded_model, model_metadata
 
-    model, metadata = load_artifact_from_file(
-        local_file_path
-    )
+    model, metadata = load_artifact_from_file(local_file_path)
 
     with MODEL_LOCK:
         loaded_model = model
@@ -315,10 +303,7 @@ def validate_features(
         None,
     )
 
-    if (
-        expected_features is not None
-        and len(features) != expected_features
-    ):
+    if expected_features is not None and len(features) != expected_features:
         raise HTTPException(
             status_code=400,
             detail=(
@@ -331,6 +316,7 @@ def validate_features(
 # ---------------------------------------------------------------------
 # FastAPI lifespan
 # ---------------------------------------------------------------------
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -350,14 +336,10 @@ async def lifespan(app: FastAPI):
     try:
         object_storage.check_bucket()
         print(
-            "Object storage connection: OK. "
-            f"bucket={settings.object_storage_bucket}"
+            "Object storage connection: OK. " f"bucket={settings.object_storage_bucket}"
         )
     except Exception as exc:
-        print(
-            "Object storage connection failed: "
-            f"{type(exc).__name__}: {exc}"
-        )
+        print("Object storage connection failed: " f"{type(exc).__name__}: {exc}")
 
     try:
         latest_model = object_storage.get_latest_model()
@@ -365,22 +347,16 @@ async def lifespan(app: FastAPI):
         if latest_model is None:
             print("Chưa có model trên object storage.")
         else:
-            startup_model_path = (
-                MODEL_DIR / "startup-model.joblib"
-            )
+            startup_model_path = MODEL_DIR / "startup-model.joblib"
 
             object_storage.download_file(
                 object_name=latest_model["key"],
                 local_file_path=str(startup_model_path),
             )
 
-            metadata = load_model_into_memory(
-                str(startup_model_path)
-            )
+            metadata = load_model_into_memory(str(startup_model_path))
 
-            startup_model_path.unlink(
-                missing_ok=True
-            )
+            startup_model_path.unlink(missing_ok=True)
 
             print(
                 "Đã load model mới nhất: "
@@ -391,10 +367,7 @@ async def lifespan(app: FastAPI):
     except Exception as exc:
         # Không làm container fail chỉ vì chưa có model
         # hoặc object storage tạm thời chưa sẵn sàng.
-        print(
-            "Không thể load model lúc startup: "
-            f"{type(exc).__name__}: {exc}"
-        )
+        print("Không thể load model lúc startup: " f"{type(exc).__name__}: {exc}")
 
     yield
 
@@ -410,8 +383,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="ACA ML Training and Serving API",
     description=(
-        "Train model, lưu object storage, serving prediction "
-        "và download model."
+        "Train model, lưu object storage, serving prediction " "và download model."
     ),
     version="1.0.0",
     lifespan=lifespan,
@@ -421,6 +393,7 @@ app = FastAPI(
 # ---------------------------------------------------------------------
 # Basic endpoints
 # ---------------------------------------------------------------------
+
 
 @app.get("/")
 def root():
@@ -436,9 +409,7 @@ def root():
             "batch_predict": "POST /predict/batch",
             "list_models": "GET /models",
             "download": "GET /models/{model_id}/download",
-            "presigned_url": (
-                "GET /models/{model_id}/presigned-url"
-            ),
+            "presigned_url": ("GET /models/{model_id}/presigned-url"),
             "reload_latest": "POST /models/latest/load",
         },
     }
@@ -465,28 +436,29 @@ def metrics():
 # Training
 # ---------------------------------------------------------------------
 
+
 @app.post("/train")
 @app.post("/stress-train")
 def train_model(
-    n_samples: int = Query(
+    n_samples: int = Query(  # noqa: B008
         default=settings.default_n_samples,
         ge=1_000,
         le=1_000_000,
         description="Số lượng sample.",
     ),
-    n_features: int = Query(
+    n_features: int = Query(  # noqa: B008
         default=settings.default_n_features,
         ge=2,
         le=200,
         description="Số lượng feature.",
     ),
-    n_estimators: int = Query(
+    n_estimators: int = Query(  # noqa: B008
         default=settings.default_n_estimators,
         ge=1,
         le=500,
         description="Số lượng cây Random Forest.",
     ),
-    target_ram_mb: int = Query(
+    target_ram_mb: int = Query(  # noqa: B008
         default=settings.default_target_ram_mb,
         ge=0,
         le=4_096,
@@ -523,12 +495,7 @@ def train_model(
 
         # Cấp phát RAM để test metrics ACA.
         if target_ram_mb > 0:
-            num_elements = (
-                target_ram_mb
-                * 1024
-                * 1024
-                // np.dtype(np.float32).itemsize
-            )
+            num_elements = target_ram_mb * 1024 * 1024 // np.dtype(np.float32).itemsize
 
             ram_stress_array = np.ones(
                 num_elements,
@@ -569,15 +536,9 @@ def train_model(
 
         metrics_after_training = get_system_metrics()
 
-        timestamp = datetime.now(
-            timezone.utc
-        ).strftime("%Y%m%dT%H%M%SZ")
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
-        model_id = (
-            f"random-forest-"
-            f"{timestamp}-"
-            f"{uuid4().hex[:8]}"
-        )
+        model_id = f"random-forest-" f"{timestamp}-" f"{uuid4().hex[:8]}"
 
         object_name = f"models/{model_id}.joblib"
 
@@ -631,10 +592,7 @@ def train_model(
 
         return {
             "status": "success",
-            "message": (
-                "Training, upload và serving model "
-                "đã hoàn tất."
-            ),
+            "message": ("Training, upload và serving model " "đã hoàn tất."),
             "model_id": model_id,
             "object_name": object_name,
             "model_loaded": True,
@@ -651,12 +609,8 @@ def train_model(
             "metrics_after_training": metrics_after_training,
             "endpoints": {
                 "predict": "/predict",
-                "download": (
-                    f"/models/{model_id}/download"
-                ),
-                "presigned_url": (
-                    f"/models/{model_id}/presigned-url"
-                ),
+                "download": (f"/models/{model_id}/download"),
+                "presigned_url": (f"/models/{model_id}/presigned-url"),
             },
         }
 
@@ -673,10 +627,7 @@ def train_model(
     except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=(
-                f"Training hoặc upload thất bại: "
-                f"{type(exc).__name__}: {exc}"
-            ),
+            detail=(f"Training hoặc upload thất bại: " f"{type(exc).__name__}: {exc}"),
         ) from exc
 
     finally:
@@ -695,6 +646,7 @@ def train_model(
 # ---------------------------------------------------------------------
 # Model information and reload
 # ---------------------------------------------------------------------
+
 
 @app.get("/model")
 def model_info():
@@ -740,9 +692,7 @@ def load_latest_model():
             local_file_path=str(local_model_path),
         )
 
-        metadata = load_model_into_memory(
-            str(local_model_path)
-        )
+        metadata = load_model_into_memory(str(local_model_path))
 
         return {
             "status": "success",
@@ -765,6 +715,7 @@ def load_latest_model():
 # ---------------------------------------------------------------------
 # Prediction serving
 # ---------------------------------------------------------------------
+
 
 @app.post(
     "/predict",
@@ -794,9 +745,7 @@ def predict(request: PredictRequest):
         probabilities = None
 
         if hasattr(model, "predict_proba"):
-            probabilities = model.predict_proba(
-                input_data
-            ).tolist()
+            probabilities = model.predict_proba(input_data).tolist()
 
         return {
             "status": "success",
@@ -813,14 +762,11 @@ def predict(request: PredictRequest):
             detail=f"Prediction thất bại: {exc}",
         ) from exc
 
-    
+
 @app.post(
     "/predict/batch",
     summary="Predict nhiều sample",
-    description=(
-        "Gửi nhiều sample. Mỗi sample phải có "
-        "đúng số feature của model."
-    ),
+    description=("Gửi nhiều sample. Mỗi sample phải có " "đúng số feature của model."),
 )
 def predict_batch(request: BatchPredictRequest):
     model = get_current_model()
@@ -844,9 +790,7 @@ def predict_batch(request: BatchPredictRequest):
         probabilities = None
 
         if hasattr(model, "predict_proba"):
-            probabilities = model.predict_proba(
-                input_data
-            ).tolist()
+            probabilities = model.predict_proba(input_data).tolist()
 
         return {
             "status": "success",
@@ -877,8 +821,7 @@ def predict_example():
     expected_features = get_expected_features(model)
 
     example_features = [
-        round(index / 10, 4)
-        for index in range(1, expected_features + 1)
+        round(index / 10, 4) for index in range(1, expected_features + 1)
     ]
 
     input_data = np.asarray(
@@ -892,9 +835,7 @@ def predict_example():
         probabilities = None
 
         if hasattr(model, "predict_proba"):
-            probabilities = model.predict_proba(
-                input_data
-            ).tolist()
+            probabilities = model.predict_proba(input_data).tolist()
 
         return {
             "status": "success",
@@ -926,10 +867,7 @@ def model_input_schema():
         "model_type": type(model).__name__,
         "expected_features": expected_features,
         "request_format": {
-            "features": [
-                f"feature_{index}"
-                for index in range(expected_features)
-            ]
+            "features": [f"feature_{index}" for index in range(expected_features)]
         },
     }
 
@@ -938,12 +876,11 @@ def model_input_schema():
 # Download and object listing
 # ---------------------------------------------------------------------
 
+
 @app.get("/models")
 def list_models():
     try:
-        objects = object_storage.list_objects(
-            prefix="models/"
-        )
+        objects = object_storage.list_objects(prefix="models/")
 
         return {
             "count": len(objects),
@@ -962,9 +899,7 @@ def download_model(model_id: str):
     object_name = f"models/{model_id}.joblib"
 
     try:
-        exists = object_storage.object_exists(
-            object_name
-        )
+        exists = object_storage.object_exists(object_name)
     except Exception as exc:
         raise HTTPException(
             status_code=500,
@@ -981,9 +916,7 @@ def download_model(model_id: str):
         object_storage.download_stream(object_name),
         media_type="application/octet-stream",
         headers={
-            "Content-Disposition": (
-                f'attachment; filename="{model_id}.joblib"'
-            ),
+            "Content-Disposition": (f'attachment; filename="{model_id}.joblib"'),
         },
     )
 
@@ -991,7 +924,7 @@ def download_model(model_id: str):
 @app.get("/models/{model_id}/presigned-url")
 def create_presigned_url(
     model_id: str,
-    expires_in: int = Query(
+    expires_in: int = Query(  # noqa: B008
         default=3600,
         ge=60,
         le=86_400,
@@ -1001,9 +934,7 @@ def create_presigned_url(
     object_name = f"models/{model_id}.joblib"
 
     try:
-        exists = object_storage.object_exists(
-            object_name
-        )
+        exists = object_storage.object_exists(object_name)
     except Exception as exc:
         raise HTTPException(
             status_code=500,
@@ -1017,11 +948,9 @@ def create_presigned_url(
         )
 
     try:
-        download_url = (
-            object_storage.create_presigned_download_url(
-                object_name=object_name,
-                expires_in=expires_in,
-            )
+        download_url = object_storage.create_presigned_download_url(
+            object_name=object_name,
+            expires_in=expires_in,
         )
 
         return {
@@ -1034,9 +963,7 @@ def create_presigned_url(
     except Exception as exc:
         raise HTTPException(
             status_code=500,
-            detail=(
-                f"Không thể tạo presigned URL: {exc}"
-            ),
+            detail=(f"Không thể tạo presigned URL: {exc}"),
         ) from exc
 
 
@@ -1064,6 +991,7 @@ def delete_model(model_id: str):
             status_code=500,
             detail=f"Xóa model thất bại: {exc}",
         ) from exc
+
 
 def normalize_prediction_input(
     features: list[Any],
@@ -1104,8 +1032,7 @@ def normalize_prediction_input(
         raise HTTPException(
             status_code=400,
             detail=(
-                "features phải là danh sách số hoặc "
-                "danh sách các danh sách số."
+                "features phải là danh sách số hoặc " "danh sách các danh sách số."
             ),
         )
 

@@ -64,9 +64,7 @@ class ObjectStorage:
             )
             return True
         except ClientError as exc:
-            error_code = str(
-                exc.response.get("Error", {}).get("Code", "")
-            )
+            error_code = str(exc.response.get("Error", {}).get("Code", ""))
 
             if error_code in {
                 "404",
@@ -150,9 +148,7 @@ class ObjectStorage:
             if not response.get("IsTruncated"):
                 break
 
-            continuation_token = response.get(
-                "NextContinuationToken"
-            )
+            continuation_token = response.get("NextContinuationToken")
 
             if not continuation_token:
                 break
@@ -165,11 +161,7 @@ class ObjectStorage:
     ) -> dict | None:
         objects = self.list_objects(prefix=prefix)
 
-        model_objects = [
-            item
-            for item in objects
-            if item["key"].endswith(".joblib")
-        ]
+        model_objects = [item for item in objects if item["key"].endswith(".joblib")]
 
         if not model_objects:
             return None
