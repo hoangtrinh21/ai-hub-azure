@@ -1,5 +1,5 @@
-from core.container_app_manager import AzureContainerAppManager
-from core.settings import settings
+from submmit.core.container_app_manager import AzureContainerAppManager
+from submmit.core.settings import settings
 
 if __name__ == "__main__":
     manager = AzureContainerAppManager()
